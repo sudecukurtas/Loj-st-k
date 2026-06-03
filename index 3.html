@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lojistik Dijital İkizi — Kontrol Kulesi V3.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060a0f;
+    --panel: #0d1520;
+    --panel2: #111c2b;
+    --border: #1e3048;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --accent3: #39ff14;
+    --accent4: #ff2d78;
+    --muted: #4a6580;
+    --text: #c8dff0;
+    --text2: #7a9ab8;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scan line overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,229,255,0.015) 2px, rgba(0,229,255,0.015) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* Header */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #0a1525 0%, var(--bg) 100%);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    font-family: var(--sans); font-weight: 800; font-size: 20px;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(0,229,255,0.4);
+  }
+  .logo span { color: var(--text2); font-weight: 400; }
+  .status-bar {
+    display: flex; gap: 24px; align-items: center;
+  }
+  .status-pill {
+    font-family: var(--mono); font-size: 11px;
+    padding: 4px 12px; border-radius: 2px;
+    border: 1px solid;
+  }
+  .pill-live { border-color: var(--accent3); color: var(--accent3); animation: pulse-border 2s infinite; }
+  .pill-time { border-color: var(--muted); color: var(--text2); }
+  @keyframes pulse-border { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  /* Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 320px 1fr 300px;
+    gap: 0;
+    height: calc(100vh - 61px);
+  }
+
+  /* Sidebar */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .section-header {
+    padding: 14px 20px 10px;
+    font-size: 10px; font-weight: 600; letter-spacing: 2px;
+    color: var(--muted); text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    position: sticky; top: 0; z-index: 10;
+  }
+
+  /* Action buttons */
+  .actions {
+    display: flex; gap: 8px; padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .btn {
+    flex: 1; padding: 10px 8px;
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    border: 1px solid; border-radius: 2px; cursor: pointer;
+    letter-spacing: 1px; text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .btn-start { border-color: var(--accent3); color: var(--accent3); background: rgba(57,255,20,0.05); }
+  .btn-start:hover { background: rgba(57,255,20,0.15); }
+  .btn-start.running { border-color: var(--accent4); color: var(--accent4); background: rgba(255,45,120,0.05); }
+  .btn-reset { border-color: var(--muted); color: var(--text2); background: transparent; }
+  .btn-reset:hover { border-color: var(--text2); color: var(--text); }
+  .btn-csv { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.05); }
+  .btn-csv:hover { background: rgba(0,229,255,0.15); }
+
+  /* Control groups */
+  .ctrl-group {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ctrl-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 1px;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 10px;
+  }
+
+  /* Tabs */
+  .tab-bar {
+    display: flex; border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    flex: 1; padding: 10px; font-family: var(--mono); font-size: 11px;
+    text-align: center; cursor: pointer; color: var(--text2);
+    border-bottom: 2px solid transparent; transition: all 0.2s;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Slider */
+  .slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .slider-row label { font-size: 12px; color: var(--text2); min-width: 130px; }
+  .slider-row input[type=range] {
+    flex: 1; -webkit-appearance: none; height: 3px;
+    background: var(--border); border-radius: 2px; outline: none;
+  }
+  .slider-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    background: var(--accent); border-radius: 50%; cursor: pointer;
+    box-shadow: 0 0 8px rgba(0,229,255,0.6);
+  }
+  .slider-val {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    min-width: 38px; text-align: right;
+  }
+
+  /* Fleet composition */
+  .fleet-comp {
+    margin-top: 6px;
+  }
+  .fleet-item {
+    margin-bottom: 14px;
+  }
+  .fleet-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .fleet-icon { font-size: 16px; }
+  .fleet-name { font-size: 12px; color: var(--text); flex: 1; }
+  .fleet-pct {
+    font-family: var(--mono); font-size: 12px;
+    min-width: 36px; text-align: right;
+  }
+  .fleet-bar-bg {
+    height: 4px; background: var(--border); border-radius: 2px; margin-top: 6px;
+  }
+  .fleet-bar-fill {
+    height: 100%; border-radius: 2px; transition: width 0.3s;
+  }
+  .fleet-warn {
+    font-family: var(--mono); font-size: 10px; color: var(--accent4);
+    margin-top: 6px; display: none;
+  }
+
+  /* City courier controls */
+  .city-list { padding: 4px 0; }
+  .city-item {
+    padding: 10px 20px;
+    border-bottom: 1px solid rgba(30,48,72,0.5);
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .city-item:hover { background: rgba(0,229,255,0.04); }
+  .city-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .city-name { font-size: 12px; font-weight: 600; flex: 1; }
+  .city-couriers {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .city-count {
+    font-family: var(--mono); font-size: 12px; color: var(--accent);
+    min-width: 30px; text-align: right;
+  }
+  .city-btn {
+    width: 20px; height: 20px; border-radius: 2px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text2); cursor: pointer;
+    font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .city-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Radio weather */
+  .weather-opts { display: flex; flex-direction: column; gap: 6px; }
+  .weather-opt {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-radius: 2px; border: 1px solid var(--border);
+    cursor: pointer; transition: all 0.15s;
+    font-size: 12px;
+  }
+  .weather-opt:hover { border-color: var(--muted); }
+  .weather-opt.selected { border-color: var(--accent); background: rgba(0,229,255,0.06); color: var(--accent); }
+  .weather-opt input { display: none; }
+
+  /* Policy toggles */
+  .policy-list { display: flex; flex-direction: column; gap: 6px; }
+  .policy-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-radius: 2px; border: 1px solid var(--border);
+    font-size: 12px; cursor: pointer; transition: all 0.15s;
+  }
+  .policy-item:hover { border-color: var(--muted); }
+  .policy-item.on { border-color: var(--accent3); background: rgba(57,255,20,0.04); }
+  .toggle {
+    width: 32px; height: 16px; background: var(--border); border-radius: 8px;
+    position: relative; flex-shrink: 0; transition: background 0.2s;
+  }
+  .toggle::after {
+    content: ''; position: absolute; width: 12px; height: 12px;
+    background: var(--muted); border-radius: 50%; top: 2px; left: 2px;
+    transition: all 0.2s;
+  }
+  .policy-item.on .toggle { background: rgba(57,255,20,0.3); }
+  .policy-item.on .toggle::after { background: var(--accent3); left: 18px; }
+
+  /* Center: map + metrics */
+  .center { display: flex; flex-direction: column; overflow: hidden; }
+
+  /* KPI bar */
+  .kpi-bar {
+    display: grid; grid-template-columns: repeat(5,1fr);
+    border-bottom: 1px solid var(--border);
+  }
+  .kpi {
+    padding: 14px 20px; border-right: 1px solid var(--border);
+    position: relative; overflow: hidden;
+  }
+  .kpi:last-child { border-right: none; }
+  .kpi-val {
+    font-family: var(--mono); font-size: 22px; font-weight: 700;
+    color: var(--accent); line-height: 1;
+    text-shadow: 0 0 15px rgba(0,229,255,0.4);
+  }
+  .kpi-label { font-size: 10px; color: var(--muted); margin-top: 4px; letter-spacing: 1px; text-transform: uppercase; }
+  .kpi-sub { font-family: var(--mono); font-size: 10px; color: var(--text2); margin-top: 2px; }
+  .kpi-spark { position: absolute; bottom: 0; right: 0; opacity: 0.3; }
+
+  /* Map area */
+  .map-area { flex: 1; position: relative; overflow: hidden; background: #060e1a; }
+  canvas#mapCanvas { position: absolute; inset: 0; }
+
+  /* Alert ticker */
+  .alert-ticker {
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    padding: 8px 20px;
+    font-family: var(--mono); font-size: 11px;
+    display: flex; align-items: center; gap: 12px;
+    overflow: hidden;
+  }
+  .ticker-label {
+    color: var(--accent4); font-weight: 700; white-space: nowrap;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1}50%{opacity:0} }
+  .ticker-text { color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Right panel: telemetry */
+  .right-panel {
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .telemetry {
+    flex: 1; overflow-y: auto; padding: 0;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+  .log-entry {
+    padding: 8px 16px; border-bottom: 1px solid rgba(30,48,72,0.4);
+    font-family: var(--mono); font-size: 10px; line-height: 1.5;
+    animation: logIn 0.3s ease;
+  }
+  @keyframes logIn { from { opacity:0; transform: translateX(10px); } to { opacity:1; transform: none; } }
+  .log-time { color: var(--muted); }
+  .log-city { color: var(--accent); font-weight: 700; }
+  .log-msg { color: var(--text2); }
+  .log-ok .log-icon { color: var(--accent3); }
+  .log-warn .log-icon { color: var(--accent2); }
+  .log-err .log-icon { color: var(--accent4); }
+
+  /* City detail panel */
+  .city-detail {
+    border-top: 1px solid var(--border);
+    padding: 16px;
+    background: var(--panel);
+  }
+  .city-detail h3 {
+    font-size: 13px; font-weight: 800; color: var(--accent);
+    margin-bottom: 12px; letter-spacing: 1px;
+  }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .detail-stat {
+    background: var(--panel2); padding: 8px; border-radius: 2px;
+    border: 1px solid var(--border);
+  }
+  .detail-stat-val { font-family: var(--mono); font-size: 14px; color: var(--accent); }
+  .detail-stat-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  /* Speed slider at bottom of sidebar */
+  .speed-section { padding: 14px 20px; border-top: 1px solid var(--border); }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Responsive tab switch */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Sim speed */
+  .sim-speed-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .speed-btn {
+    padding: 4px 10px; font-family: var(--mono); font-size: 11px;
+    border: 1px solid var(--border); background: transparent; color: var(--text2);
+    cursor: pointer; border-radius: 2px; transition: all 0.15s;
+  }
+  .speed-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.08); }
+
+  .disruption-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 6px;
+  }
+  .disruption-label {
+    font-size: 11px; color: var(--text2); flex: 1;
+  }
+  .disruption-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    animation: pulse-dot 2s infinite;
+  }
+  @keyframes pulse-dot { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:0.7} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">LOJİSTİK <span>/ DİJİTAL İKİZ</span></div>
+  <div class="status-bar">
+    <div class="status-pill pill-live">● CANLI</div>
+    <div class="status-pill pill-time" id="clockPill">--:--:--</div>
+    <div class="status-pill" style="border-color:var(--accent2);color:var(--accent2)">V3.0</div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar">
+    <!-- Actions -->
+    <div class="actions">
+      <button class="btn btn-start" id="btnStart" onclick="toggleSim()">▶ BAŞLAT</button>
+      <button class="btn btn-reset" onclick="resetSim()">↺ SFR</button>
+      <button class="btn btn-csv" onclick="downloadCSV()">⬇ CSV</button>
+    </div>
+
+    <!-- Tabs: Şehirler / Çevre / Filo / Politika -->
+    <div class="tab-bar">
+      <div class="tab active" onclick="switchTab('cities',this)">Şehirler</div>
+      <div class="tab" onclick="switchTab('env',this)">Çevre</div>
+      <div class="tab" onclick="switchTab('fleet',this)">Filo</div>
+      <div class="tab" onclick="switchTab('policy',this)">Politika</div>
+    </div>
+
+    <!-- TAB: Şehirler -->
+    <div class="tab-content active" id="tab-cities">
+      <div style="padding:10px 20px 6px;font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;">İl başına aktif kurye sayısı</div>
+      <div class="city-list" id="cityList"></div>
+    </div>
+
+    <!-- TAB: Çevre -->
+    <div class="tab-content" id="tab-env">
+      <div class="ctrl-group">
+        <div class="ctrl-label">Genel Trafik Yoğunluğu</div>
+        <div class="slider-row">
+          <input type="range" min="0" max="100" value="20" id="trafficSlider" oninput="updateSliderVal(this,'trafficVal','%')">
+          <span class="slider-val" id="trafficVal">20%</span>
+        </div>
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-label">Hava Durumu</div>
+        <div class="weather-opts" id="weatherOpts">
+          <label class="weather-opt selected">
+            <input type="radio" name="weather" value="sunny" checked onchange="setWeather(this)">
+            <span>☀️ Güneşli</span><span style="font-size:10px;color:var(--muted);margin-left:auto">Optimal</span>
+          </label>
+          <label class="weather-opt">
+            <input type="radio" name="weather" value="rain" onchange="setWeather(this)">
+            <span>🌧️ Yağmurlu</span><span style="font-size:10px;color:var(--accent2);margin-left:auto">Hız -20%</span>
+          </label>
+          <label class="weather-opt">
+            <input type="radio" name="weather" value="snow" onchange="setWeather(this)">
+            <span>❄️ Karlı</span><span style="font-size:10px;color:var(--accent4);margin-left:auto">Hız -60%</span>
+          </label>
+        </div>
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-label">Müşteri Adreste Yok Oranı</div>
+        <div class="slider-row">
+          <input type="range" min="0" max="30" value="5" id="missSlider" oninput="updateSliderVal(this,'missVal','%')">
+          <span class="slider-val" id="missVal">5%</span>
+        </div>
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-label">Sipariş Akış Hızı</div>
+        <div class="slider-row">
+          <input type="range" min="1" max="20" value="4" id="flowSlider" oninput="updateSliderVal(this,'flowVal',' /sn')">
+          <span class="slider-val" id="flowVal">4 /sn</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Filo -->
+    <div class="tab-content" id="tab-fleet">
+      <div class="ctrl-group">
+        <div class="ctrl-label">Filo Kompozisyonu <span style="color:var(--text2);font-size:10px">(toplam %100)</span></div>
+        <div class="fleet-comp">
+          <div class="fleet-item">
+            <div class="fleet-row">
+              <span class="fleet-icon">🏍️</span>
+              <span class="fleet-name">Motosiklet</span>
+              <span class="fleet-pct" id="pctMoto" style="color:#ff6b35">35%</span>
+            </div>
+            <div class="slider-row" style="margin-top:6px">
+              <input type="range" min="0" max="100" value="35" id="motoSlider" oninput="updateFleet()">
+            </div>
+            <div class="fleet-bar-bg"><div class="fleet-bar-fill" id="barMoto" style="width:35%;background:#ff6b35"></div></div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px">Hız: yüksek | Kapasite: düşük | CO2: orta</div>
+          </div>
+          <div class="fleet-item">
+            <div class="fleet-row">
+              <span class="fleet-icon">🚐</span>
+              <span class="fleet-name">Panelvan</span>
+              <span class="fleet-pct" id="pctVan" style="color:#00e5ff">40%</span>
+            </div>
+            <div class="slider-row" style="margin-top:6px">
+              <input type="range" min="0" max="100" value="40" id="vanSlider" oninput="updateFleet()">
+            </div>
+            <div class="fleet-bar-bg"><div class="fleet-bar-fill" id="barVan" style="width:40%;background:#00e5ff"></div></div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px">Hız: orta | Kapasite: yüksek | CO2: yüksek</div>
+          </div>
+          <div class="fleet-item">
+            <div class="fleet-row">
+              <span class="fleet-icon">⚡</span>
+              <span class="fleet-name">Elektrikli</span>
+              <span class="fleet-pct" id="pctEV" style="color:#39ff14">25%</span>
+            </div>
+            <div class="slider-row" style="margin-top:6px">
+              <input type="range" min="0" max="100" value="25" id="evSlider" oninput="updateFleet()">
+            </div>
+            <div class="fleet-bar-bg"><div class="fleet-bar-fill" id="barEV" style="width:25%;background:#39ff14"></div></div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px">Hız: orta | Kapasite: orta | CO2: sıfır</div>
+          </div>
+        </div>
+        <div class="fleet-warn" id="fleetWarn">⚠ Toplam %100 olmalı — otomatik normalize edildi</div>
+        <!-- Fleet summary bar -->
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="height:12px;border-radius:2px;overflow:hidden;display:flex">
+            <div id="fleetBarMoto" style="height:100%;background:#ff6b35;transition:width 0.3s;width:35%"></div>
+            <div id="fleetBarVan" style="height:100%;background:#00e5ff;transition:width 0.3s;width:40%"></div>
+            <div id="fleetBarEV" style="height:100%;background:#39ff14;transition:width 0.3s;width:25%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--muted)">
+            <span>🏍️ <span id="summMoto">35</span>%</span>
+            <span>🚐 <span id="summVan">40</span>%</span>
+            <span>⚡ <span id="summEV">25</span>%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Politika -->
+    <div class="tab-content" id="tab-policy">
+      <div class="ctrl-group">
+        <div class="ctrl-label">Ajan Politikaları</div>
+        <div class="policy-list" id="policyList">
+          <div class="policy-item on" onclick="togglePolicy(this)">
+            <div class="toggle"></div>
+            <div>
+              <div style="font-size:12px;font-weight:600">⚡ Dinamik Kurye</div>
+              <div style="font-size:10px;color:var(--muted)">Talebe göre otonom besleme</div>
+            </div>
+          </div>
+          <div class="policy-item on" onclick="togglePolicy(this)">
+            <div class="toggle"></div>
+            <div>
+              <div style="font-size:12px;font-weight:600">🎯 SLA Öncelikli</div>
+              <div style="font-size:10px;color:var(--muted)">Hızlı teslimatı öne çek</div>
+            </div>
+          </div>
+          <div class="policy-item on" onclick="togglePolicy(this)">
+            <div class="toggle"></div>
+            <div>
+              <div style="font-size:12px;font-weight:600">🌿 Ekolojik Rota</div>
+              <div style="font-size:10px;color:var(--muted)">EV önceliği, CO2 azalt</div>
+            </div>
+          </div>
+          <div class="policy-item" onclick="togglePolicy(this)">
+            <div class="toggle"></div>
+            <div>
+              <div style="font-size:12px;font-weight:600">🛡️ Güvenli Sürüş</div>
+              <div style="font-size:10px;color:var(--muted)">Kötü havada yavaşla</div>
+            </div>
+          </div>
+          <div class="policy-item" onclick="togglePolicy(this)">
+            <div class="toggle"></div>
+            <div>
+              <div style="font-size:12px;font-weight:600">🔄 Yük Dengeleme</div>
+              <div style="font-size:10px;color:var(--muted)">İller arası kaynak paylaşımı</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sim speed -->
+    <div class="speed-section">
+      <div class="ctrl-label" style="margin-bottom:8px">Simülasyon Hızı</div>
+      <div class="sim-speed-row">
+        <button class="speed-btn active" onclick="setSpeed(1,this)">1×</button>
+        <button class="speed-btn" onclick="setSpeed(2,this)">2×</button>
+        <button class="speed-btn" onclick="setSpeed(5,this)">5×</button>
+        <button class="speed-btn" onclick="setSpeed(10,this)">10×</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER -->
+  <div class="center">
+    <!-- KPI bar -->
+    <div class="kpi-bar">
+      <div class="kpi">
+        <div class="kpi-val" id="kpiCouriers">0</div>
+        <div class="kpi-label">Toplam Kurye</div>
+        <div class="kpi-sub">Türkiye geneli</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val" id="kpiOrders">0</div>
+        <div class="kpi-label">Dağıtılan Sipariş</div>
+        <div class="kpi-sub" id="kpiOrdersSub">11 il toplamı</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val" id="kpiSLA" style="color:var(--accent3)">—</div>
+        <div class="kpi-label">SLA Başarısı</div>
+        <div class="kpi-sub">İlk seferde</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val" id="kpiTime">—</div>
+        <div class="kpi-label">Ort. Süre</div>
+        <div class="kpi-sub">Dakika (yükleme dahil)</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val" id="kpiCO2" style="color:var(--accent3)">0.00</div>
+        <div class="kpi-label">Net CO₂ (kg)</div>
+        <div class="kpi-sub" id="kpiCO2Sub">—</div>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div class="map-area">
+      <canvas id="mapCanvas"></canvas>
+    </div>
+
+    <!-- Alert ticker -->
+    <div class="alert-ticker">
+      <span class="ticker-label">▶ UYARI</span>
+      <span class="ticker-text" id="tickerText">Simülasyon başlatılmadı — Başlat butonuna basın</span>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="section-header">Telemetri Logları</div>
+    <div class="telemetry" id="telemetry"></div>
+    <div class="city-detail" id="cityDetail">
+      <h3 id="cityDetailName">— Şehir Seçin —</h3>
+      <div class="detail-grid" id="detailGrid">
+        <div class="detail-stat"><div class="detail-stat-val">—</div><div class="detail-stat-lbl">Kurye</div></div>
+        <div class="detail-stat"><div class="detail-stat-val">—</div><div class="detail-stat-lbl">Sipariş</div></div>
+        <div class="detail-stat"><div class="detail-stat-val">—</div><div class="detail-stat-lbl">SLA %</div></div>
+        <div class="detail-stat"><div class="detail-stat-val">—</div><div class="detail-stat-lbl">CO₂ kg</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+const CITIES = [
+  { name:'İstanbul',   lat:41.015, lng:28.979, pop:15.8, color:'#00e5ff' },
+  { name:'Ankara',     lat:39.925, lng:32.866, pop:5.6,  color:'#ff6b35' },
+  { name:'İzmir',      lat:38.418, lng:27.128, pop:4.4,  color:'#39ff14' },
+  { name:'Bursa',      lat:40.182, lng:29.067, pop:3.1,  color:'#ffd700' },
+  { name:'Antalya',    lat:36.896, lng:30.713, pop:2.6,  color:'#ff2d78' },
+  { name:'Adana',      lat:37.000, lng:35.321, pop:2.2,  color:'#a78bfa' },
+  { name:'Konya',      lat:37.874, lng:32.493, pop:2.3,  color:'#fb923c' },
+  { name:'Gaziantep',  lat:37.066, lng:37.383, pop:2.1,  color:'#34d399' },
+  { name:'Trabzon',    lat:41.002, lng:39.716, pop:0.8,  color:'#60a5fa' },
+  { name:'Erzurum',    lat:39.905, lng:41.269, pop:0.7,  color:'#f472b6' },
+  { name:'Diyarbakır', lat:37.910, lng:40.220, pop:1.7,  color:'#facc15' }
+];
+
+// City state
+const cityState = CITIES.map((c,i) => ({
+  ...c,
+  couriers: Math.round(30 + c.pop * 8),
+  orders: 0,
+  sla: 98 + Math.random(),
+  co2: 0,
+  disruption: null
+}));
+
+// Global sim state
+let simRunning = false;
+let simInterval = null;
+let simSpeed = 1;
+let simTick = 0;
+let totalOrders = 0;
+let selectedCity = null;
+let weather = 'sunny';
+let logCount = 0;
+
+const alerts = [
+  'Erzurum genelinde kar fırtınası — kuryeler yavaşladı',
+  'İstanbul Avrupa yakası trafik yoğunluğu kritik seviyede',
+  'Antalya tatil sezonu — sipariş %40 arttı',
+  'Ankara merkez depo kapasite doluluk %92',
+  'Gaziantep-Adana koridorunda rota optimizasyonu aktif',
+  'İzmir liman bölgesi geçici kapatma — alternatif rota',
+  'Konya bölgesi SLA riski — ek kurye devreye alındı',
+  'Trabzon dağ yolları buzlanma uyarısı',
+  'Bursa OSB teslimat patlaması — dinamik kurye aktif',
+  'Diyarbakır bölgesi sınır ötesi sipariş artışı'
+];
+
+let alertIdx = 0;
+const logMessages = [
+  (c)=>`${c} → Rota optimize edildi. ETA -12%`,
+  (c)=>`${c} → SLA koruma aktif, 3 sipariş öne alındı`,
+  (c)=>`${c} → Yeni kurye ataması yapıldı`,
+  (c)=>`${c} → Depo rampa bekleme süresi normalleşti`,
+  (c)=>`${c} → CO₂ tasarrufu: EV filo devreye girdi`,
+  (c)=>`${c} → Müşteri adreste yok, yeniden planlama`,
+  (c)=>`${c} → Trafik sinyali kooperatif sistemi aktif`,
+  (c)=>`${c} → Paket hasar bildirimi alındı — sigorta tetiklendi`,
+];
+
+// ─── CANVAS MAP ─────────────────────────────────────────────────────────────
+const canvas = document.getElementById('mapCanvas');
+const ctx = canvas.getContext('2d');
+
+// Turkey bounding box approximation (lat/lng → px)
+const MAP_BOUNDS = { latMin:36, latMax:42.5, lngMin:26, lngMax:43 };
+
+function latlngToXY(lat, lng) {
+  const x = (lng - MAP_BOUNDS.lngMin) / (MAP_BOUNDS.lngMax - MAP_BOUNDS.lngMin) * canvas.width;
+  const y = (1 - (lat - MAP_BOUNDS.latMin) / (MAP_BOUNDS.latMax - MAP_BOUNDS.latMin)) * canvas.height;
+  return [x, y];
+}
+
+// Simple Turkey outline (approximate polygon)
+const TURKEY_POLY = [
+  [41.9,26.1],[41.6,27.5],[41.2,28.2],[40.9,28.8],[40.5,29.3],[40.0,29.8],
+  [39.5,30.2],[38.8,30.5],[38.0,30.5],[37.5,30.8],[36.8,31.2],[36.4,32.0],
+  [36.2,33.3],[36.1,34.2],[36.1,35.1],[36.3,35.7],[36.5,36.2],[36.7,36.5],
+  [36.9,36.8],[37.1,37.4],[37.1,38.2],[37.5,38.9],[37.9,39.5],[38.4,40.0],
+  [39.0,40.5],[39.5,41.0],[40.0,41.5],[40.3,42.0],[40.9,42.7],[41.5,42.5],
+  [41.9,41.8],[42.1,41.0],[41.8,40.3],[41.6,39.5],[41.3,38.5],[41.2,37.5],
+  [41.4,36.8],[41.8,35.8],[41.9,35.0],[41.8,34.0],[41.9,33.0],[41.8,32.0],
+  [41.7,31.0],[41.9,30.0],[41.9,29.0],[41.9,28.0],[41.9,27.0],[41.9,26.5],[41.9,26.1]
+];
+
+// Particles
+let particles = [];
+
+function resizeCanvas() {
+  const mapArea = document.querySelector('.map-area');
+  canvas.width = mapArea.offsetWidth;
+  canvas.height = mapArea.offsetHeight;
+}
+
+function drawMap() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Dark gradient background
+  const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  grad.addColorStop(0, '#040c18');
+  grad.addColorStop(1, '#060e1a');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(30,48,72,0.3)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i < 20; i++) {
+    const x = (canvas.width / 20) * i;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    const y = (canvas.height / 12) * i;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  // Turkey outline
+  ctx.beginPath();
+  TURKEY_POLY.forEach(([lat,lng],i) => {
+    const [x,y] = latlngToXY(lat,lng);
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,229,255,0.04)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,229,255,0.25)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Draw connections between cities
+  cityState.forEach((a, i) => {
+    cityState.forEach((b, j) => {
+      if (j <= i) return;
+      const dist = Math.hypot(a.lat-b.lat, a.lng-b.lng);
+      if (dist > 8) return;
+      const [ax, ay] = latlngToXY(a.lat, a.lng);
+      const [bx, by] = latlngToXY(b.lat, b.lng);
+      ctx.beginPath();
+      ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+      ctx.strokeStyle = 'rgba(0,229,255,0.06)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    });
+  });
+
+  // Draw particles
+  particles.forEach(p => {
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+
+  // Draw cities
+  const t = Date.now() / 1000;
+  cityState.forEach((city, i) => {
+    const [x, y] = latlngToXY(city.lat, city.lng);
+    const isSelected = selectedCity === i;
+    const isActive = simRunning;
+    const pulse = Math.sin(t * 2 + i) * 0.3 + 0.7;
+
+    // Pulse ring
+    if (isActive) {
+      const ringR = 14 + pulse * 8;
+      ctx.beginPath();
+      ctx.arc(x, y, ringR, 0, Math.PI*2);
+      ctx.strokeStyle = city.color + '33';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // Selection ring
+    if (isSelected) {
+      ctx.beginPath();
+      ctx.arc(x, y, 18, 0, Math.PI*2);
+      ctx.strokeStyle = '#ffffff66';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    // City dot
+    const dotR = 6 + city.pop * 0.8;
+    const grad2 = ctx.createRadialGradient(x,y,0,x,y,dotR);
+    grad2.addColorStop(0, city.color);
+    grad2.addColorStop(1, city.color + '44');
+    ctx.beginPath();
+    ctx.arc(x, y, dotR, 0, Math.PI*2);
+    ctx.fillStyle = grad2;
+    ctx.fill();
+    ctx.strokeStyle = city.color;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Disruption indicator
+    if (city.disruption) {
+      ctx.beginPath();
+      ctx.arc(x, y, dotR + 5, 0, Math.PI*2);
+      ctx.strokeStyle = '#ff2d7888';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Label
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${isSelected?13:11}px 'Space Mono', monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(city.name, x, y - dotR - 8);
+
+    // Courier count badge
+    ctx.fillStyle = 'rgba(6,10,15,0.85)';
+    ctx.fillRect(x - 18, y + dotR + 2, 36, 14);
+    ctx.fillStyle = city.color;
+    ctx.font = '9px Space Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${city.couriers}K`, x, y + dotR + 12);
+  });
+
+  ctx.textAlign = 'left';
+}
+
+// ─── PARTICLES ──────────────────────────────────────────────────────────────
+function spawnParticle(fromIdx, toIdx) {
+  const from = cityState[fromIdx];
+  const to = cityState[toIdx];
+  const [x0,y0] = latlngToXY(from.lat, from.lng);
+  const [x1,y1] = latlngToXY(to.lat, to.lng);
+  particles.push({
+    x: x0, y: y0, tx: x1, ty: y1,
+    color: from.color, r: 2,
+    alpha: 1, progress: 0, speed: 0.008 + Math.random()*0.01
+  });
+}
+
+function updateParticles() {
+  particles = particles.filter(p => p.alpha > 0.05);
+  particles.forEach(p => {
+    p.progress = Math.min(1, p.progress + p.speed * simSpeed);
+    p.x = p.x + (p.tx - p.x) * p.speed * simSpeed;
+    p.y = p.y + (p.ty - p.y) * p.speed * simSpeed;
+    if (p.progress > 0.8) p.alpha -= 0.03;
+  });
+}
+
+// ─── CITY LIST UI ───────────────────────────────────────────────────────────
+function buildCityList() {
+  const el = document.getElementById('cityList');
+  el.innerHTML = '';
+  cityState.forEach((city, i) => {
+    const row = document.createElement('div');
+    row.className = 'city-item';
+    row.id = `city-row-${i}`;
+    row.onclick = () => selectCity(i);
+    row.innerHTML = `
+      <div class="city-dot" style="background:${city.color};box-shadow:0 0 6px ${city.color}88"></div>
+      <div class="city-name">${city.name}</div>
+      <div class="city-couriers">
+        <button class="city-btn" onclick="event.stopPropagation();changeCourier(${i},-5)">−</button>
+        <span class="city-count" id="courier-${i}">${city.couriers}</span>
+        <button class="city-btn" onclick="event.stopPropagation();changeCourier(${i},5)">+</button>
+      </div>
+    `;
+    el.appendChild(row);
+  });
+}
+
+function changeCourier(idx, delta) {
+  cityState[idx].couriers = Math.max(5, cityState[idx].couriers + delta);
+  document.getElementById(`courier-${idx}`).textContent = cityState[idx].couriers;
+  updateKPIs();
+}
+
+function selectCity(idx) {
+  selectedCity = idx;
+  document.querySelectorAll('.city-item').forEach((r,i) => {
+    r.style.background = i===idx ? 'rgba(0,229,255,0.07)' : '';
+    r.style.borderLeft = i===idx ? `2px solid ${cityState[i].color}` : '2px solid transparent';
+  });
+  updateCityDetail(idx);
+}
+
+function updateCityDetail(idx) {
+  const c = cityState[idx];
+  document.getElementById('cityDetailName').textContent = `📍 ${c.name}`;
+  document.getElementById('cityDetailName').style.color = c.color;
+  document.getElementById('detailGrid').innerHTML = `
+    <div class="detail-stat">
+      <div class="detail-stat-val" style="color:${c.color}">${c.couriers}</div>
+      <div class="detail-stat-lbl">Aktif Kurye</div>
+    </div>
+    <div class="detail-stat">
+      <div class="detail-stat-val">${c.orders.toLocaleString()}</div>
+      <div class="detail-stat-lbl">Sipariş</div>
+    </div>
+    <div class="detail-stat">
+      <div class="detail-stat-val" style="color:var(--accent3)">${c.sla.toFixed(1)}%</div>
+      <div class="detail-stat-lbl">SLA Başarısı</div>
+    </div>
+    <div class="detail-stat">
+      <div class="detail-stat-val">${c.co2.toFixed(2)}</div>
+      <div class="detail-stat-lbl">CO₂ (kg)</div>
+    </div>
+  `;
+}
+
+// ─── KPIs ────────────────────────────────────────────────────────────────────
+function updateKPIs() {
+  const totalCouriers = cityState.reduce((s,c)=>s+c.couriers,0);
+  document.getElementById('kpiCouriers').textContent = totalCouriers.toLocaleString();
+  document.getElementById('kpiOrders').textContent = totalOrders.toLocaleString();
+
+  if (simRunning) {
+    // Calc SLA weighted by couriers
+    const avgSLA = cityState.reduce((s,c)=>s+c.sla,0)/cityState.length;
+    document.getElementById('kpiSLA').textContent = avgSLA.toFixed(1)+'%';
+
+    const avgTime = 18 + (weather==='rain'?4:0) + (weather==='snow'?12:0) +
+      parseFloat(document.getElementById('trafficSlider').value)*0.1;
+    document.getElementById('kpiTime').textContent = avgTime.toFixed(1)+' dk';
+
+    const evPct = getFleet().ev / 100;
+    const totalCO2 = cityState.reduce((s,c)=>s+c.co2,0);
+    const saved = (evPct * 100 * 30).toFixed(0);
+    document.getElementById('kpiCO2').textContent = totalCO2.toFixed(2);
+    document.getElementById('kpiCO2Sub').textContent = `⚡ %${(evPct*100).toFixed(0)} EV → ${saved}g tasarruf`;
+  }
+
+  if (selectedCity !== null) updateCityDetail(selectedCity);
+}
+
+// ─── FLEET ───────────────────────────────────────────────────────────────────
+let lastValid = { moto:35, van:40, ev:25 };
+
+function getFleet() {
+  return {
+    moto: parseInt(document.getElementById('motoSlider').value),
+    van: parseInt(document.getElementById('vanSlider').value),
+    ev: parseInt(document.getElementById('evSlider').value)
+  };
+}
+
+function updateFleet() {
+  const f = getFleet();
+  const total = f.moto + f.van + f.ev;
+
+  // Show warning if not 100
+  const warn = document.getElementById('fleetWarn');
+  if (total !== 100) {
+    warn.style.display = 'block';
+  } else {
+    warn.style.display = 'none';
+    lastValid = {...f};
+  }
+
+  // Normalize for display
+  const norm = total > 0 ? {
+    moto: Math.round(f.moto/total*100),
+    van: Math.round(f.van/total*100),
+    ev: Math.round(f.ev/total*100)
+  } : {moto:33,van:33,ev:34};
+
+  document.getElementById('pctMoto').textContent = norm.moto+'%';
+  document.getElementById('pctVan').textContent = norm.van+'%';
+  document.getElementById('pctEV').textContent = norm.ev+'%';
+  document.getElementById('barMoto').style.width = norm.moto+'%';
+  document.getElementById('barVan').style.width = norm.van+'%';
+  document.getElementById('barEV').style.width = norm.ev+'%';
+  document.getElementById('fleetBarMoto').style.width = norm.moto+'%';
+  document.getElementById('fleetBarVan').style.width = norm.van+'%';
+  document.getElementById('fleetBarEV').style.width = norm.ev+'%';
+  document.getElementById('summMoto').textContent = norm.moto;
+  document.getElementById('summVan').textContent = norm.van;
+  document.getElementById('summEV').textContent = norm.ev;
+}
+
+// ─── SIM ENGINE ──────────────────────────────────────────────────────────────
+function toggleSim() {
+  simRunning = !simRunning;
+  const btn = document.getElementById('btnStart');
+  if (simRunning) {
+    btn.textContent = '⏸ DURAKLAT';
+    btn.classList.add('running');
+    startSim();
+  } else {
+    btn.textContent = '▶ DEVAM';
+    btn.classList.remove('running');
+    clearInterval(simInterval);
+  }
+}
+
+function startSim() {
+  clearInterval(simInterval);
+  simInterval = setInterval(tick, 1000 / simSpeed);
+}
+
+function tick() {
+  simTick++;
+  const flow = parseInt(document.getElementById('flowSlider').value);
+  const miss = parseFloat(document.getElementById('missSlider').value)/100;
+  const traffic = parseFloat(document.getElementById('trafficSlider').value)/100;
+  const fleet = getFleet();
+  const evRatio = fleet.ev / (fleet.moto + fleet.van + fleet.ev || 100);
+
+  cityState.forEach((city, i) => {
+    // Orders
+    const orderDelta = Math.round(flow * city.pop * (0.8 + Math.random()*0.4) * simSpeed);
+    city.orders += orderDelta;
+    totalOrders += orderDelta;
+
+    // SLA drift
+    const weatherPenalty = weather==='rain'?2:weather==='snow'?8:0;
+    const slaTarget = 99 - miss*30 - traffic*15 - weatherPenalty + (city.couriers/100)*2;
+    city.sla += (slaTarget - city.sla) * 0.05;
+    city.sla = Math.max(60, Math.min(99.9, city.sla));
+
+    // CO2
+    const baseCO2 = orderDelta * 0.002;
+    city.co2 += baseCO2 * (1 - evRatio * 0.85);
+
+    // Disruption
+    if (weather==='snow' && (city.name==='Erzurum'||city.name==='Trabzon')) {
+      city.disruption = 'snow';
+    } else if (weather==='rain' && Math.random()<0.05) {
+      city.disruption = 'rain';
+    } else {
+      city.disruption = null;
+    }
+
+    // Random particle spawn
+    if (simTick % Math.max(1, Math.round(3/simSpeed)) === 0 && Math.random() < 0.4) {
+      const target = Math.floor(Math.random()*cityState.length);
+      if (target !== i) spawnParticle(i, target);
+    }
+  });
+
+  // Log
+  if (simTick % Math.max(1, Math.round(5/simSpeed)) === 0) {
+    addLog();
+  }
+
+  // Alert rotation
+  if (simTick % Math.max(1, Math.round(20/simSpeed)) === 0) {
+    alertIdx = (alertIdx+1) % alerts.length;
+    document.getElementById('tickerText').textContent = alerts[alertIdx];
+  }
+
+  updateKPIs();
+  updateParticles();
+}
+
+function addLog() {
+  const cityIdx = Math.floor(Math.random()*cityState.length);
+  const city = cityState[cityIdx];
+  const msgFn = logMessages[Math.floor(Math.random()*logMessages.length)];
+  const msg = msgFn(city.name);
+
+  const types = ['ok','ok','ok','warn','err'];
+  const type = types[Math.floor(Math.random()*types.length)];
+  const icons = {ok:'✓',warn:'⚠',err:'✗'};
+
+  const el = document.getElementById('telemetry');
+  const now = new Date();
+  const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+
+  const entry = document.createElement('div');
+  entry.className = `log-entry log-${type}`;
+  entry.innerHTML = `<span class="log-icon">${icons[type]} </span><span class="log-time">${time} </span><span class="log-msg">${msg}</span>`;
+
+  el.insertBefore(entry, el.firstChild);
+  logCount++;
+  if (logCount > 150) el.lastChild && el.removeChild(el.lastChild);
+}
+
+function resetSim() {
+  simRunning = false;
+  clearInterval(simInterval);
+  const btn = document.getElementById('btnStart');
+  btn.textContent = '▶ BAŞLAT';
+  btn.classList.remove('running');
+
+  simTick = 0; totalOrders = 0; particles = [];
+  cityState.forEach((c,i) => {
+    c.orders = 0; c.sla = 98+Math.random(); c.co2 = 0; c.disruption = null;
+    c.couriers = Math.round(30 + c.pop * 8);
+    document.getElementById(`courier-${i}`).textContent = c.couriers;
+  });
+
+  document.getElementById('kpiOrders').textContent = '0';
+  document.getElementById('kpiSLA').textContent = '—';
+  document.getElementById('kpiTime').textContent = '—';
+  document.getElementById('kpiCO2').textContent = '0.00';
+  document.getElementById('kpiCO2Sub').textContent = '—';
+  document.getElementById('telemetry').innerHTML = '';
+  document.getElementById('tickerText').textContent = 'Simülasyon sıfırlandı';
+  logCount = 0;
+  updateKPIs();
+}
+
+// ─── UI HELPERS ──────────────────────────────────────────────────────────────
+function updateSliderVal(el, valId, suffix) {
+  document.getElementById(valId).textContent = el.value + suffix;
+}
+
+function setWeather(radio) {
+  weather = radio.value;
+  document.querySelectorAll('.weather-opt').forEach(opt => {
+    opt.classList.toggle('selected', opt.querySelector('input').value === weather);
+  });
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+function togglePolicy(el) {
+  el.classList.toggle('on');
+}
+
+function setSpeed(s, btn) {
+  simSpeed = s;
+  document.querySelectorAll('.speed-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if (simRunning) startSim();
+}
+
+function downloadCSV() {
+  const rows = ['İl,Kurye,Sipariş,SLA%,CO2kg'];
+  cityState.forEach(c => {
+    rows.push(`${c.name},${c.couriers},${c.orders},${c.sla.toFixed(2)},${c.co2.toFixed(3)}`);
+  });
+  const blob = new Blob([rows.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `lojistik-rapor-${Date.now()}.csv`;
+  a.click();
+}
+
+// ─── CLOCK ───────────────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clockPill').textContent =
+    `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ─── MAP CLICK ───────────────────────────────────────────────────────────────
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  cityState.forEach((city, i) => {
+    const [cx, cy] = latlngToXY(city.lat, city.lng);
+    if (Math.hypot(mx-cx, my-cy) < 20) {
+      selectCity(i);
+      // Switch to cities tab
+      const tabs = document.querySelectorAll('.tab');
+      switchTab('cities', tabs[0]);
+    }
+  });
+});
+
+// ─── RENDER LOOP ─────────────────────────────────────────────────────────────
+function loop() {
+  drawMap();
+  requestAnimationFrame(loop);
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+resizeCanvas();
+window.addEventListener('resize', () => { resizeCanvas(); });
+buildCityList();
+updateFleet();
+updateKPIs();
+loop();
+</script>
+</body>
+</html>
